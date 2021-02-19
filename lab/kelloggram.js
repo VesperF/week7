@@ -27,13 +27,12 @@ firebase.auth().onAuthStateChanged(async function(user) {
     // Listen for the form submit and create/render the new post
     document.querySelector('form').addEventListener('submit', async function(event) {
       event.preventDefault()
-      let postUsername = document.querySelector('#username').value
+      let postUsername = user.displayName
       let postImageUrl = document.querySelector('#image-url').value
       let postNumberOfLikes = 0
       let docRef = await db.collection('posts').add({ 
         username: postUsername, 
         imageUrl: postImageUrl, 
-        likes: 0,
         created: firebase.firestore.FieldValue.serverTimestamp()
       })
       let postId = docRef.id // the newly created document's ID
@@ -48,7 +47,16 @@ firebase.auth().onAuthStateChanged(async function(user) {
       let postData = posts[i].data()
       let postUsername = postData.username
       let postImageUrl = postData.imageUrl
-      let postNumberOfLikes = postData.likes
+      // let postNumberOfLikes = postData.likes
+      //Step 6:
+
+      let querySnapshot = await db.collection('likes')
+      .where('postId','==', postId)
+      .get()
+
+      let postNumberOfLikes = querySnapshot.size
+
+
       renderPost(postId, postUsername, postImageUrl, postNumberOfLikes)
     }
 
@@ -95,12 +103,33 @@ async function renderPost(postId, postUsername, postImageUrl, postNumberOfLikes)
   document.querySelector(`.post-${postId} .like-button`).addEventListener('click', async function(event) {
     event.preventDefault()
     console.log(`post ${postId} like button clicked!`)
-    let existingNumberOfLikes = document.querySelector(`.post-${postId} .likes`).innerHTML
-    let newNumberOfLikes = parseInt(existingNumberOfLikes) + 1
-    document.querySelector(`.post-${postId} .likes`).innerHTML = newNumberOfLikes
-    await db.collection('posts').doc(postId).update({
-      likes: firebase.firestore.FieldValue.increment(1)
-    })
+   
+
+    let currentUser = firebase.auth().currentUser
+
+    //step 4:
+
+    let querySnapshot = await db.collection('likes')
+    .where('postId','==', postId)
+    .where('userId','==', currentUser.uid)
+    .get()
+
+    if(querySnapshot.size == 0) {
+       //Step 3: "Liking" should add a new "likes" document in Firestore with the post ID and current user ID
+       await db.collection('likes').add({
+        postId: postId,
+        userId: currentUser.uid
+      })
+
+     let existingNumberOfLikes = document.querySelector(`.post-${postId} .likes`).innerHTML
+     let newNumberOfLikes = parseInt(existingNumberOfLikes) + 1
+     document.querySelector(`.post-${postId} .likes`).innerHTML = newNumberOfLikes
+
+    }
+
+    // await db.collection('posts').doc(postId).update({
+    //   likes: firebase.firestore.FieldValue.increment(1)
+    // })
   })
 }
 
